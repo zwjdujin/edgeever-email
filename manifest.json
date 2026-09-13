@@ -1,0 +1,119 @@
+{
+  "type": "plugin",
+  "id": "com.zwjdujin.edgeever-email",
+  "name": "邮件提醒",
+  "version": "1.0.0",
+  "apiVersion": "2",
+  "settingsUi": "host",
+  "description": "到点发邮件的提醒中心：扫描全部笔记中的待办任务（兼容 edgeever-tasks 语法 [due:: 日期]）与笔记内 [remind:: 日期 时间] 提醒字段，到时通过 SMTP 自动发送通知邮件；支持自发自收防垃圾箱、提前提醒、测试邮件与本地中转。",
+  "author": "zwjdujin",
+  "entry": "./main.js",
+  "platforms": [
+    "web",
+    "desktop"
+  ],
+  "permissions": [
+    "notes:read",
+    "notes:write",
+    "editor:write",
+    "ui:commands",
+    "ui:notices",
+    "ui:panels",
+    "ui:navigation"
+  ],
+  "settings": {
+    "fields": [
+      {
+        "key": "smtp-host",
+        "type": "text",
+        "label": "SMTP 服务器",
+        "default": "smtp.qq.com",
+        "description": "如 smtp.qq.com、smtp.163.com、smtp.gmail.com。"
+      },
+      {
+        "key": "smtp-port",
+        "type": "text",
+        "label": "SMTP 端口",
+        "default": "465",
+        "description": "SSL 加密常用 465，STARTTLS 常用 587。"
+      },
+      {
+        "key": "smtp-secure",
+        "type": "text",
+        "label": "加密方式",
+        "default": "ssl",
+        "description": "ssl（465 端口直连 TLS）/ starttls（587 端口升级 TLS）/ none（不加密，不推荐）。"
+      },
+      {
+        "key": "smtp-user",
+        "type": "text",
+        "label": "SMTP 账号",
+        "default": "",
+        "description": "通常是你的邮箱地址。"
+      },
+      {
+        "key": "smtp-pass",
+        "type": "text",
+        "label": "SMTP 授权码",
+        "default": "",
+        "description": "在邮箱设置中生成的授权码，不是邮箱登录密码。"
+      },
+      {
+        "key": "mail-from",
+        "type": "text",
+        "label": "发件人",
+        "default": "",
+        "description": "留空则使用 SMTP 账号。强烈建议与收件人相同（自发自收，避免进垃圾箱）。"
+      },
+      {
+        "key": "mail-to",
+        "type": "text",
+        "label": "收件人",
+        "default": "",
+        "description": "留空则发给自己；多个地址用英文逗号分隔。自发自收最不容易进垃圾箱。"
+      },
+      {
+        "key": "task-remind-time",
+        "type": "text",
+        "label": "待办提醒时刻",
+        "default": "08:30",
+        "description": "待办只有日期（无时间）时，在该时刻提醒，如 08:30。"
+      },
+      {
+        "key": "task-lead-minutes",
+        "type": "text",
+        "label": "待办提前量（分钟）",
+        "default": "0",
+        "description": "提前多少分钟发送提醒邮件，0 表示到点即发。仅对待办生效。"
+      },
+      {
+        "key": "scan-interval-seconds",
+        "type": "text",
+        "label": "扫描间隔（秒）",
+        "default": "60",
+        "description": "每隔多少秒扫描一次笔记中的提醒，最小 30。"
+      },
+      {
+        "key": "scan-tags",
+        "type": "text",
+        "label": "扫描标签",
+        "default": "",
+        "description": "留空扫描全部笔记；填写标签（逗号分隔）可缩小扫描范围、加快速度。"
+      },
+      {
+        "key": "relay-url",
+        "type": "text",
+        "label": "本地中转地址",
+        "default": "",
+        "description": "如 http://127.0.0.1:8787。插件沙箱无法直连 SMTP 时，运行 relay/server.mjs 后填写此处。"
+      },
+      {
+        "key": "state-notebook",
+        "type": "text",
+        "label": "状态笔记本",
+        "default": "EdgeEver 邮件提醒",
+        "description": "用于记录已发送提醒的笔记本（自动创建，其中的状态笔记请勿手工编辑）。"
+      }
+    ]
+  }
+}
