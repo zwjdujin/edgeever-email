@@ -15,7 +15,8 @@ const path = require("node:path");
 const { execSync } = require("node:child_process");
 const zlib = require("node:zlib");
 
-const ROOT = path.resolve(__dirname, "..");
+// 本脚本放在插件根目录（与 manifest.json 同级），ROOT 就是 __dirname
+const ROOT = path.resolve(__dirname);
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const TAG = `v${MANIFEST.version}`;
 const OWNER = "zwjdujin";
@@ -78,7 +79,8 @@ const api = async (method, path, opts = {}) => {
   });
 };
 
-const is404 = (res) => res.status === 404;
+// 请求失败（无 token/网络）按"不存在"处理，让后续进入新建分支并自然报错
+const is404 = (res) => !res || res.status === 404;
 
 // ----------------------------------------------------------------- 本地 zip --
 // 仅 deflate + local file header / central directory / EOCD，满足 GitHub 附件上传即可
@@ -161,21 +163,9 @@ const buildZip = (entries) => {
   console.log(`   仓库 : https://github.com/${OWNER}/${REPO}`);
   console.log(`   标签 : ${TAG}`);
   console.log(`   附件 : ${path.basename(ZIP)}`);
+  console.log(`   模式 : ${dryRun ? "仅预览（不写磁盘、不调 API）" : "正式发布"}`);
   console.log("");
 
-  // --- 1. 本地 tag ---
-  const tagOut = execSync(`git tag -l ${TAG}`, { cwd: ROOT, encoding: "utf8" }).trim();
-  if (tagOut !== TAG) {
-    console.log(`1️⃣  创建本地标签 ${TAG}`);
-    if (!dryRun) execSync(`git tag -a ${TAG} -m "Release ${MANIFEST.version}"`, { cwd: ROOT, stdio: "inherit" });
-  } else { console.log(`1️⃣  本地标签 ${TAG} 已存在，跳过`); }
-
-  // --- 2. 推送 tag ---
-  console.log(`2️⃣  推送标签 ${TAG}`);
-  if (!dryRun) execSync(`git push origin ${TAG}`, { cwd: ROOT, stdio: "inherit" });
-
-  // --- 3. 打包 zip ---
-  console.log("3️⃣  打包 Release 附件");
   const entries = [
     { src: path.join(ROOT, "main.js"), name: "main.js" },
     { src: path.join(ROOT, "manifest.json"), name: "manifest.json" },
@@ -185,8 +175,25 @@ const buildZip = (entries) => {
   for (const f of entries) {
     if (!fs.existsSync(f.src)) throw new Error(`附件缺失: ${f.name}`);
   }
+
+  // --- 1. 本地 tag ---
+  const tagOut = execSync(`git tag -l ${TAG}`, { cwd: ROOT, encoding: "utf8" }).trim();
+  if (tagOut !== TAG) {
+    console.log(`1️⃣  创建本地标签 ${TAG}`);
+    if (dryRun) console.log("   （--dry-run 跳过）");
+    else execSync(`git tag -a ${TAG} -m "Release ${MANIFEST.version}"`, { cwd: ROOT, stdio: "inherit" });
+  } else { console.log(`1️⃣  本地标签 ${TAG} 已存在，跳过`); }
+
+  // --- 2. 推送 tag ---
+  console.log(`2️⃣  推送标签 ${TAG}`);
+  if (dryRun) console.log("   （--dry-run 跳过）");
+  else execSync(`git push origin ${TAG}`, { cwd: ROOT, stdio: "inherit" });
+
+  // --- 3. 打包 zip ---
+  console.log("3️⃣  打包 Release 附件");
   if (dryRun) {
-    console.log(`   （--dry-run 跳过打包，预估 ${entries.reduce((a, f) => a + fs.statSync(f.src).size, 0) / 1024} KB）`);
+    const total = entries.reduce((a, f) => a + fs.statSync(f.src).size, 0);
+    console.log(`   （--dry-run 跳过打包，预估 ${total / 1024} KB）`);
   } else {
     fs.writeFileSync(ZIP, buildZip(entries));
     console.log(`   ✅ ${ZIP} (${Math.round(fs.statSync(ZIP).size / 1024)} KB)`);
@@ -217,10 +224,15 @@ const buildZip = (entries) => {
   let release = found ? existing.body : null;
   if (release) {
     console.log(`   已存在 Release (id ${release.id})，更新描述与附件`);
-    if (!dryRun) await api("PATCH", `/repos/${OWNER}/${REPO}/releases/${release.id}`, { json: { name: `${MANIFEST.name} ${MANIFEST.version}`, body: releaseBody } });
+    if (dryRun) console.log("   （--dry-run 跳过 PATCH）");
+    else await api("PATCH", `/repos/${OWNER}/${REPO}/releases/${release.id}`, { json: { name: `${MANIFEST.name} ${MANIFEST.version}`, body: releaseBody } });
   } else {
     console.log("   新建 Release");
-    if (!dryRun) {
+    if (dryRun) {
+      console.log("   （--dry-run 跳过 POST）");
+      // 模拟一个 release id 以便展示后续步骤，不实际调用 API
+      release = { id: "<dry-run placeholder>" };
+    } else {
       const created = await api("POST", `/repos/${OWNER}/${REPO}/releases`, {
         json: { tag_name: TAG, name: `${MANIFEST.name} ${MANIFEST.version}`, body: releaseBody, draft: false, prerelease: false },
       });
